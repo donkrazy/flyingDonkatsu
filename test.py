@@ -80,23 +80,43 @@ def manage_features(images, token, method):
     url = 'http://api.welcome.kakao.com/image/feature'
     headers = {"X-Auth-Token": token}
     if method == 'POST':
-        # r = requests.post('http://httpbin.org/post', data=json.dumps({'data': features}), headers=headers)
         requests.post(url, data=json.dumps({'data': features}), headers=headers)
     elif method == 'DELETE':
-        # r = requests.delete('http://httpbin.org/delete', data=json.dumps({'data': features}), headers=headers)
         requests.delete(url, data=json.dumps({'data': features}), headers=headers)
 
-    # print(r.text)
-
     return len(features)
+
+
+def crawl(seed_list, token):
+    while True:
+        for i in range(len(seed_list)):
+            seed = seed_list[i]
+            document = get_document(seed, token)
+            images = document['images']
+            result = manage_image(images, token)
+            print('got document from {}, {} images, {}/{}(post/delete) features'.format(seed, len(images), result[0], result[1]))
+            next_url = document['next_url']
+            seed_list[i] = next_url
 
 
 if __name__ == '__main__':
     token = get_token()
     seed_list = get_seed(token)
-    for seed in seed_list:
-        document = get_document(seed, token)
-        images = document['images']
-        result = manage_image(images, token)
-        # next_url = document['next_url']
-        print('got document from {}, {} images, {}/{}(post/delete) features'.format(seed, len(images), result[0], result[1]))
+    crawl(seed_list, token)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
