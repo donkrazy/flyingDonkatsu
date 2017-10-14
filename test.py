@@ -3,6 +3,9 @@ import urllib.error
 import urllib.parse
 import json
 import requests
+import threading
+import time
+import sys
 
 
 def get_token():
@@ -15,8 +18,9 @@ def get_token():
             token_submit = response.read().decode('utf-8')
             f.write(token_submit)
     # 403 error: read token from file
-    # TODO: get toekn from body
-    except urllib.error.HTTPError:
+    # TODO: get token from body
+    except urllib.error.HTTPError as e:
+        print(e)
         with open('token') as f:
             token_submit = f.read()
     return token_submit
@@ -35,7 +39,11 @@ def get_document(seed, token):
     url = 'http://api.welcome.kakao.com{}'.format(seed)
     request = urllib.request.Request(url)
     request.add_header("X-Auth-Token", token)
-    response = urllib.request.urlopen(request)
+    try:
+        response = urllib.request.urlopen(request)
+    except urllib.error.HTTPError as e:
+        print(e.code, '10 minutes..')
+        sys.exit()
     document = json.loads(response.read().decode('utf-8'))
     return document
 
@@ -73,7 +81,19 @@ def manage_features(images, token, method):
     url = 'http://api.welcome.kakao.com/image/feature?id={}'.format(','.join(images))
     request = urllib.request.Request(url)
     request.add_header("X-Auth-Token", token)
-    response = urllib.request.urlopen(request)
+
+    # 들어올 때는 마음대로지만 나갈 때는 아니란다.
+    try:
+        response = urllib.request.urlopen(request)
+    except urllib.error.HTTPError as e:  # 503
+        print(e)
+        time.sleep(1)
+        return manage_features(images, token, method)
+    except ConnectionResetError as e:
+        print(e)
+        time.sleep(1)
+        return manage_features(images, token, method)
+
     features = json.loads(response.read().decode('utf-8'))['features']
 
     # post or delete features
@@ -87,36 +107,51 @@ def manage_features(images, token, method):
     return len(features)
 
 
-def crawl(seed_list, token):
-    while True:
-        for i in range(len(seed_list)):
-            seed = seed_list[i]
-            document = get_document(seed, token)
+class Crawler(threading.Thread):
+    num_post = 0
+    num_delete = 0
+
+    def __init__(self, name, seed, token):
+        super(Crawler, self).__init__()
+        self.name = name
+        self.seed = seed
+        self.next_url = seed
+        self.token = token
+
+    def run(self):
+        while True:
+            url = self.next_url
+            document = get_document(url, token)
+            next_url = document['next_url']
+            self.next_url = next_url
+            # 리젠될때까지 기다림
+            # 리젠 주기 파악
+            if url == next_url:
+                time.sleep(1)
+                continue
             images = document['images']
             result = manage_image(images, token)
-            print('got document from {}, {} images, {}/{}(post/delete) features'.format(seed, len(images), result[0], result[1]))
-            next_url = document['next_url']
-            seed_list[i] = next_url
+            self.num_post += result[0]
+            self.num_delete += result[1]
+
+
+def crawl(seed_list, token):
+    crawler_list = []
+    for seed in seed_list:
+        name = seed.split('/')[2]
+        crawler = Crawler(name, seed, token)
+        crawler.start()
+        crawler_list.append(crawler)
+
+    # simple timer
+    while True:
+        time.sleep(10)
+        print('#######{}########'.format(time.ctime()))
+        for crawler in crawler_list:
+            print('{}: {}/{}'.format(crawler.name, crawler.num_post, crawler.num_delete))
 
 
 if __name__ == '__main__':
     token = get_token()
     seed_list = get_seed(token)
     crawl(seed_list, token)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
