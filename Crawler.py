@@ -28,8 +28,8 @@ class Crawler(threading.Thread):
         except urllib.error.HTTPError as e:
             print(e.code, '10 minutes..')
             self.join()
-            # self.exit()
-            # sys.exit()
+            self.exit()
+            sys.exit()
         document = json.loads(response.read().decode('utf-8'))
         return document
 
@@ -80,13 +80,24 @@ class Crawler(threading.Thread):
 
         features = json.loads(response.read().decode('utf-8'))['features']
 
-        # post or delete features
-        url = 'http://api.welcome.kakao.com/image/feature'
-        headers = {"X-Auth-Token": self.token}
-        if method == 'POST':
-            requests.post(url, data=json.dumps({'data': features}), headers=headers)
-        elif method == 'DELETE':
-            requests.delete(url, data=json.dumps({'data': features}), headers=headers)
+        if len(features) > 50:
+            # post or delete features
+            url = 'http://api.welcome.kakao.com/image/feature'
+            headers = {"X-Auth-Token": self.token}
+            if method == 'POST':
+                requests.post(url, data=json.dumps({'data': features[:50]}), headers=headers)
+                requests.post(url, data=json.dumps({'data': features[50:]}), headers=headers)
+            elif method == 'DELETE':
+                requests.delete(url, data=json.dumps({'data': features[:50]}), headers=headers)
+                requests.delete(url, data=json.dumps({'data': features[50:]}), headers=headers)
+        else:
+            # post or delete features
+            url = 'http://api.welcome.kakao.com/image/feature'
+            headers = {"X-Auth-Token": self.token}
+            if method == 'POST':
+                requests.post(url, data=json.dumps({'data': features}), headers=headers)
+            elif method == 'DELETE':
+                requests.delete(url, data=json.dumps({'data': features}), headers=headers)
 
         return len(features)
 
