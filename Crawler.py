@@ -15,7 +15,6 @@ class Crawler(threading.Thread):
     def __init__(self, name, seed, token):
         super(Crawler, self).__init__()
         self.name = name
-        self.seed = seed
         self.next_url = seed
         self.token = token
 
@@ -27,6 +26,7 @@ class Crawler(threading.Thread):
             response = urllib.request.urlopen(request)
         except urllib.error.HTTPError as e:
             print(e.code, '10 minutes..')
+            # TODO 2: 왜안꺼져!
             self.join()
             self.exit()
             sys.exit()
@@ -35,7 +35,7 @@ class Crawler(threading.Thread):
 
     def manage_image(self, images):
         image_dict = {}
-        # TODO: duplicate?
+        # TODO 6: 중복 image 관리
         for img in images:
             if img['type'] == 'add':
                 image_dict[img['id']] = 'add'
@@ -50,15 +50,16 @@ class Crawler(threading.Thread):
             else:
                 to_delete.append(img_id)
 
-        num_post = self.manage_features(to_save, 'POST')
-        num_delete = self.manage_features(to_delete, 'DELETE')
+        num_post = self.manage_feature(to_save, 'POST')
+        num_delete = self.manage_feature(to_delete, 'DELETE')
         return (num_post, num_delete)
 
-    def manage_features(self, images, method):
+    '''Get features from images, Add/Delete features'''
+    def manage_feature(self, images, method):
         # slice images if 50^ images
         if len(images) > 50:
-            num_feature = self.manage_features(images[:50], method)
-            num_feature += self.manage_features(images[50:], method)
+            num_feature = self.manage_feature(images[:50], method)
+            num_feature += self.manage_feature(images[50:], method)
             return num_feature
 
         # get features
@@ -73,32 +74,22 @@ class Crawler(threading.Thread):
             print(e)
             time.sleep(1)
             return self.manage_features(images, method)
-        except ConnectionResetError as e:
+        except ConnectionResetError as e:  # API 초당 50 제한
             print(e)
             time.sleep(1)
             return self.manage_features(images, method)
-
         features = json.loads(response.read().decode('utf-8'))['features']
 
-        if len(features) > 50:
-            # post or delete features
-            url = 'http://api.welcome.kakao.com/image/feature'
-            headers = {"X-Auth-Token": self.token}
-            if method == 'POST':
-                requests.post(url, data=json.dumps({'data': features[:50]}), headers=headers)
-                requests.post(url, data=json.dumps({'data': features[50:]}), headers=headers)
-            elif method == 'DELETE':
-                requests.delete(url, data=json.dumps({'data': features[:50]}), headers=headers)
-                requests.delete(url, data=json.dumps({'data': features[50:]}), headers=headers)
-        else:
-            # post or delete features
-            url = 'http://api.welcome.kakao.com/image/feature'
-            headers = {"X-Auth-Token": self.token}
-            if method == 'POST':
-                requests.post(url, data=json.dumps({'data': features}), headers=headers)
-            elif method == 'DELETE':
-                requests.delete(url, data=json.dumps({'data': features}), headers=headers)
-
+        # post or delete features
+        url = 'http://api.welcome.kakao.com/image/feature'
+        headers = {"X-Auth-Token": self.token}
+        # slice features if 50^, 50개 미만일 시 data=null값으로 오류 발생 ㄴ(?)
+        if method == 'POST':
+            requests.post(url, data=json.dumps({'data': features[:50]}), headers=headers)
+            requests.post(url, data=json.dumps({'data': features[50:]}), headers=headers)
+        elif method == 'DELETE':
+            requests.delete(url, data=json.dumps({'data': features[:50]}), headers=headers)
+            requests.delete(url, data=json.dumps({'data': features[50:]}), headers=headers)
         return len(features)
 
     def run(self):
@@ -107,8 +98,8 @@ class Crawler(threading.Thread):
             document = self.get_document(url)
             next_url = document['next_url']
             self.next_url = next_url
-            # 리젠될때까지 기다림
-            # 리젠 주기 파악
+            # 같은 document일 경우 리젠될때까지 기다림(url, next_url 비교)
+            # TODO 4: 리젠 주기 파악
             if url == next_url:
                 time.sleep(1)
                 continue

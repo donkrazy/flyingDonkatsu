@@ -15,7 +15,7 @@ def get_token():
             token_submit = response.read().decode('utf-8')
             f.write(token_submit)
     # 403 error: read token from file
-    # TODO: get token from body
+    # TODO 1: get token from response body
     except urllib.error.HTTPError as e:
         print(e)
         with open('token') as f:
@@ -33,6 +33,7 @@ def get_seed(token):
 
 
 def crawl(seed_list, token):
+    # Make 5 threads(number of seeds)
     crawler_list = []
     for seed in seed_list:
         name = seed.split('/')[2]
@@ -40,7 +41,7 @@ def crawl(seed_list, token):
         crawler.start()
         crawler_list.append(crawler)
 
-    # simple checker
+    # simple work checker
     while True:
         time.sleep(10)
         print('#######{}########'.format(time.ctime()))
@@ -50,5 +51,5 @@ def crawl(seed_list, token):
 
 if __name__ == '__main__':
     token = get_token()
-    seed_list = get_seed(token)
+    seed_list = get_seed(token)  # category별 seed
     crawl(seed_list, token)
